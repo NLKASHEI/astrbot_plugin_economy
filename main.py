@@ -3,10 +3,10 @@
 astrbot_plugin_economy - 棱镜娘经济系统 v1.2
 
 对齐类脑娘 Odyssey Coin：
-- /余额  查询货币余额（人格化展示）
-- /商店  浏览商品（分类+emoji+详细描述）
-- /购买  购买道具（好感度联动）
-- /交易记录  查看最近交易
+- /balance  查询货币余额（人格化展示）
+- /shop  浏览商品（分类+emoji+详细描述）
+- /buy  购买道具（好感度联动）
+- /transactions  查看最近交易
 - 每日首次发言奖励（可配置浮动）
 - 好感度联动：购买礼物自动增加好感度
 - WebUI 可配置货币名称/图标/每日奖励范围
@@ -210,8 +210,9 @@ class EconomyPlugin(Star):
 
     # ==================== /余额 ====================
 
-    @filter.command("余额")
+    @filter.command("balance", alias={"余额"})
     async def cmd_balance(self, event: AstrMessageEvent):
+        """查询你的棱镜币余额"""
         uid = event.get_sender_id()
         uname = event.get_sender_name() or "你"
         bal = self.db.get_balance(uid)
@@ -240,8 +241,9 @@ class EconomyPlugin(Star):
 
     # ==================== /商店 ====================
 
-    @filter.command("商店")
+    @filter.command("shop", alias={"商店"})
     async def cmd_shop(self, event: AstrMessageEvent):
+        """查看棱镜娘商店——用棱镜币买礼物、道具"""
         uid = event.get_sender_id()
         bal = self.db.get_balance(uid)
         bot_name, _ = await self._get_persona(event)
@@ -269,25 +271,26 @@ class EconomyPlugin(Star):
                     lines.append(f"  💕 好感度 +{item['affection_bonus']}")
             lines.append("")
 
-        lines.append(f"使用 `/购买 <编号或名称>` 来购买商品")
+        lines.append(f"使用 `/buy <编号或名称>` 来购买商品")
         yield event.plain_result("\n".join(lines))
 
     # ==================== /购买 ====================
 
-    @filter.command("购买")
+    @filter.command("buy", alias={"购买"})
     async def cmd_buy(self, event: AstrMessageEvent, 商品名或编号: str = ""):
+        """购买商店商品——输入编号或名称即可"""
         uid = event.get_sender_id()
         uname = event.get_sender_name() or "你"
         bot_name, _ = await self._get_persona(event)
 
         if not 商品名或编号.strip():
-            yield event.plain_result("想买什么？用 `/商店` 看看有什么好东西吧～")
+            yield event.plain_result("想买什么？用 `/shop` 看看有什么好东西吧～")
             return
 
         item = _find_item(商品名或编号)
         if not item:
             yield event.plain_result(
-                f"没找到「{商品名或编号}」呢，用 `/商店` 看看有哪些商品吧～"
+                f"没找到「{商品名或编号}」呢，用 `/shop` 看看有哪些商品吧～"
             )
             return
 
@@ -298,7 +301,7 @@ class EconomyPlugin(Star):
                 f"{self.currency_emoji} 余额不足！\n\n"
                 f"**{item['emoji']} {item['name']}** 需要 {item['price']}{self.currency_name}\n"
                 f"你只有 **{bal}**{self.currency_name}，还差 **{shortfall}**{self.currency_name}\n\n"
-                f"*去 `/打工` 赚点钱吧～*"
+                f"*去 `/work` 赚点钱吧～*"
             )
             return
 
@@ -347,8 +350,9 @@ class EconomyPlugin(Star):
 
     # ==================== /交易记录 ====================
 
-    @filter.command("交易记录")
+    @filter.command("transactions", alias={"交易记录"})
     async def cmd_transactions(self, event: AstrMessageEvent):
+        """查看最近的交易记录"""
         uid = event.get_sender_id()
         uname = event.get_sender_name() or "你"
         txns = self.db.get_recent_transactions(uid, self.transaction_limit)
