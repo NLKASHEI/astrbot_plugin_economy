@@ -1,0 +1,32 @@
+{
+  "currency_name": {
+    "description": "货币名称",
+    "type": "text",
+    "default": "棱镜币",
+    "hint": "经济系统中使用的货币名称"
+  },
+  "currency_emoji": {
+    "description": "货币图标",
+    "type": "text",
+    "default": "💎",
+    "hint": "货币显示用的 emoji 图标"
+  },
+  "daily_reward_min": {
+    "description": "每日奖励最小值",
+    "type": "int",
+    "default": 5,
+    "hint": "每日首次发言奖励的随机最小值"
+  },
+  "daily_reward_max": {
+    "description": "每日奖励最大值",
+    "type": "int",
+    "default": 20,
+    "hint": "每日首次发言奖励的随机最大值"
+  },
+  "transaction_limit": {
+    "description": "交易记录显示条数",
+    "type": "int",
+    "default": 10,
+    "hint": "/交易记录 最多显示的记录条数"
+  }
+}
