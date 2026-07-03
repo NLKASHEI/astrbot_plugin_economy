@@ -197,6 +197,14 @@ class EconomyPlugin(Star):
             pass
         return "棱镜娘", ""
 
+    async def _send_ephemeral(self, event, content):
+        """Discord 斜杠命令私密回复；返回 True 表示已发送，False 需调用方 yield"""
+        wh = getattr(event, 'interaction_followup_webhook', None)
+        if wh:
+            await wh.send(content, ephemeral=True)
+            return True
+        return False
+
     # ==================== 被动每日奖励 ====================
 
     @filter.event_message_type(filter.EventMessageType.ALL)
@@ -237,7 +245,9 @@ class EconomyPlugin(Star):
             f"余额: **{bal}** {self.currency_name}",
             f"*{mood}*",
         ]
-        yield event.plain_result("\n".join(lines))
+        content = "\n".join(lines)
+        if not await self._send_ephemeral(event, content):
+            yield event.plain_result(content)
 
     # ==================== /商店 ====================
 
@@ -272,7 +282,9 @@ class EconomyPlugin(Star):
             lines.append("")
 
         lines.append(f"使用 `/buy <编号或名称>` 来购买商品")
-        yield event.plain_result("\n".join(lines))
+        content = "\n".join(lines)
+        if not await self._send_ephemeral(event, content):
+            yield event.plain_result(content)
 
     # ==================== /购买 ====================
 
@@ -284,30 +296,37 @@ class EconomyPlugin(Star):
         bot_name, _ = await self._get_persona(event)
 
         if not 商品名或编号.strip():
-            yield event.plain_result("想买什么？用 `/shop` 看看有什么好东西吧～")
+            if not await self._send_ephemeral(event, "想买什么？用 `/shop` 看看有什么好东西吧～"):
+                yield event.plain_result("想买什么？用 `/shop` 看看有什么好东西吧～")
             return
 
         item = _find_item(商品名或编号)
         if not item:
-            yield event.plain_result(
-                f"没找到「{商品名或编号}」呢，用 `/shop` 看看有哪些商品吧～"
-            )
+            if not await self._send_ephemeral(event, f"没找到「{商品名或编号}」呢，用 `/shop` 看看有哪些商品吧～"):
+                yield event.plain_result(f"没找到「{商品名或编号}」呢，用 `/shop` 看看有哪些商品吧～")
             return
 
         bal = self.db.get_balance(uid)
         if bal < item["price"]:
             shortfall = item["price"] - bal
-            yield event.plain_result(
+            if not await self._send_ephemeral(event,
                 f"{self.currency_emoji} 余额不足！\n\n"
                 f"**{item['emoji']} {item['name']}** 需要 {item['price']}{self.currency_name}\n"
                 f"你只有 **{bal}**{self.currency_name}，还差 **{shortfall}**{self.currency_name}\n\n"
                 f"*去 `/work` 赚点钱吧～*"
-            )
+            ):
+                yield event.plain_result(
+                    f"{self.currency_emoji} 余额不足！\n\n"
+                    f"**{item['emoji']} {item['name']}** 需要 {item['price']}{self.currency_name}\n"
+                    f"你只有 **{bal}**{self.currency_name}，还差 **{shortfall}**{self.currency_name}\n\n"
+                    f"*去 `/work` 赚点钱吧～*"
+                )
             return
 
         new_bal = self.db.remove_coins(uid, item["price"], f"购买 {item['name']}")
         if new_bal is None:
-            yield event.plain_result("购买失败，请稍后再试。")
+            if not await self._send_ephemeral(event, "购买失败，请稍后再试。"):
+                yield event.plain_result("购买失败，请稍后再试。")
             return
 
         self.db.add_to_inventory(uid, item["id"])
@@ -346,7 +365,8 @@ class EconomyPlugin(Star):
             "",
         ] + effect_lines
 
-        yield event.plain_result("\n".join(lines))
+        if not await self._send_ephemeral(event, "\n".join(lines)):
+            yield event.plain_result("\n".join(lines))
 
     # ==================== /交易记录 ====================
 
@@ -358,7 +378,8 @@ class EconomyPlugin(Star):
         txns = self.db.get_recent_transactions(uid, self.transaction_limit)
 
         if not txns:
-            yield event.plain_result(f"📜 {uname} 还没有任何交易记录呢～")
+            if not await self._send_ephemeral(event, f"📜 {uname} 还没有任何交易记录呢～"):
+                yield event.plain_result(f"📜 {uname} 还没有任何交易记录呢～")
             return
 
         total_in = sum(t["amount"] for t in txns if t["amount"] > 0)
@@ -375,7 +396,8 @@ class EconomyPlugin(Star):
             lines.append(f"{sign}{amt} {self.currency_emoji} — {t['reason']}")
             lines.append(f"  _{t['created_at']}_")
 
-        yield event.plain_result("\n".join(lines))
+        if not await self._send_ephemeral(event, "\n".join(lines)):
+            yield event.plain_result("\n".join(lines))
 
     # ==================== 好感度联动 ====================
 
