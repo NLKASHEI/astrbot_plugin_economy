@@ -275,19 +275,19 @@ class EconomyPlugin(Star):
     # ==================== /购买 ====================
 
     @filter.command("购买")
-    async def cmd_buy(self, event: AstrMessageEvent, item_query: str = ""):
+    async def cmd_buy(self, event: AstrMessageEvent, 商品名或编号: str = ""):
         uid = event.get_sender_id()
         uname = event.get_sender_name() or "你"
         bot_name, _ = await self._get_persona(event)
 
-        if not item_query.strip():
+        if not 商品名或编号.strip():
             yield event.plain_result("想买什么？用 `/商店` 看看有什么好东西吧～")
             return
 
-        item = _find_item(item_query)
+        item = _find_item(商品名或编号)
         if not item:
             yield event.plain_result(
-                f"没找到「{item_query}」呢，用 `/商店` 看看有哪些商品吧～"
+                f"没找到「{商品名或编号}」呢，用 `/商店` 看看有哪些商品吧～"
             )
             return
 
