@@ -192,7 +192,7 @@ class EconomyPlugin(Star):
             pm = self.context.persona_manager
             persona = await pm.get_default_persona_v3(umo=event.unified_msg_origin)
             if persona:
-                return persona.get("name", "棱镜娘"), persona.get("prompt", "")
+                return "棱镜娘", persona.get("prompt", "")
         except Exception:
             pass
         return "棱镜娘", ""
