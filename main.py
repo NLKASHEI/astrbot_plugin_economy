@@ -210,11 +210,25 @@ class EconomyPlugin(Star):
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def on_daily_reward(self, event: AstrMessageEvent):
         uid = event.get_sender_id()
-        if not uid:
-            return
+        if not uid or uid == event.get_self_id():
+            return  # 忽略 Bot 自己的消息
         reward = self.db.daily_reward(uid, self.daily_reward_min, self.daily_reward_max)
         if reward:
             logger.info(f"[Economy] 用户 {uid} 获得每日奖励 {reward} {self.currency_name}")
+
+    # ==================== 记忆注入 ====================
+
+    @filter.on_llm_request()
+    async def inject_economy_context(self, event: AstrMessageEvent, req):
+        """将用户余额注入 AI 上下文，让 Bot 记住用户的经济状况"""
+        uid = event.get_sender_id()
+        if not uid:
+            return
+        bal = self.db.get_balance(uid)
+        if hasattr(req, "system_prompt"):
+            req.system_prompt += (
+                f"\n[经济系统] 当前用户的{self.currency_name}余额: {bal}\n"
+            )
 
     # ==================== /余额 ====================
 
@@ -281,10 +295,79 @@ class EconomyPlugin(Star):
                     lines.append(f"  💕 好感度 +{item['affection_bonus']}")
             lines.append("")
 
-        lines.append(f"使用 `/buy <编号或名称>` 来购买商品")
+        lines.append(f"使用 `/buy <编号或名称>` 或点击下方按钮购买")
         content = "\n".join(lines)
+        # Discord 斜杠命令：发送带按钮的面板
+        wh = getattr(event, 'interaction_followup_webhook', None)
+        if wh:
+            import discord as _discord
+            view = _discord.ui.View(timeout=300)
+            for item in SHOP_ITEMS:
+                view.add_item(_discord.ui.Button(
+                    label=f"买 {item['emoji']} {item['name']}",
+                    custom_id=f"economy_buy_{item['id']}",
+                    style=_discord.ButtonStyle.primary,
+                ))
+            await wh.send(content, view=view, ephemeral=True)
+            return
         if not await self._send_ephemeral(event, content):
             yield event.plain_result(content)
+
+    # ==================== 按钮交互处理 ====================
+
+    @filter.event_message_type(filter.EventMessageType.ALL)
+    async def on_button_click(self, event: AstrMessageEvent):
+        """处理商店购买按钮点击"""
+        if not hasattr(event, 'message_obj') or not event.message_obj:
+            return
+        raw = getattr(event.message_obj, 'raw_message', None)
+        if raw is None:
+            return
+        import discord as _discord
+        if not isinstance(raw, _discord.Interaction):
+            return
+        if raw.type != _discord.InteractionType.component:
+            return
+        data = getattr(raw, 'data', {}) or {}
+        cid = data.get('custom_id', '')
+        if not cid.startswith('economy_buy_'):
+            return
+
+        item_id = cid.replace('economy_buy_', '')
+        item = _find_item(item_id)
+        uid = str(raw.user.id)
+        uname = raw.user.display_name
+
+        if not item:
+            await raw.response.send_message(f"商品「{item_id}」不存在或已下架～", ephemeral=True)
+            return
+
+        bal = self.db.get_balance(uid)
+        if bal < item["price"]:
+            shortfall = item["price"] - bal
+            await raw.response.send_message(
+                f"{self.currency_emoji} 余额不足！\n**{item['name']}** 需要 {item['price']}{self.currency_name}，"
+                f"你只有 {bal}{self.currency_name}，还差 {shortfall}{self.currency_name}～",
+                ephemeral=True,
+            )
+            return
+
+        new_bal = self.db.remove_coins(uid, item["price"], f"购买 {item['name']}")
+        if new_bal is None:
+            await raw.response.send_message("购买失败，请稍后再试。", ephemeral=True)
+            return
+
+        self.db.add_to_inventory(uid, item["id"])
+        ab = item.get("affection_bonus", 0)
+        if item["effect"] == "gift" and ab > 0:
+            self._add_affection(uid, ab, f"赠送 {item['name']}")
+
+        await raw.response.send_message(
+            f"## ✅ 购买成功\n\n{uname} 购买了 **{item['emoji']} {item['name']}**\n"
+            f"花费 {item['price']}{self.currency_name} → 余额 **{new_bal}**{self.currency_name}"
+            + (f"\n💕 好感度 +{ab}" if ab > 0 else ""),
+            ephemeral=True,
+        )
 
     # ==================== /购买 ====================
 
