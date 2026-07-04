@@ -328,8 +328,8 @@ class EconomyPlugin(Star):
             return
         if raw.type != _discord.InteractionType.component:
             return
-        data = getattr(raw, 'data', {}) or {}
-        cid = data.get('custom_id', '')
+        raw_data = getattr(raw, 'data', None)
+        cid = (raw_data or {}).get('custom_id', '') if raw_data else ''
         if not cid.startswith('economy_buy_'):
             return
 
